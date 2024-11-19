@@ -7,6 +7,7 @@ from cartopy.mpl.gridliner import LATITUDE_FORMATTER, LONGITUDE_FORMATTER
 import cartopy.feature as feature
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
+from scipy.ndimage import gaussian_filter
 
 # ==============================================================================
 # Input parameters
@@ -43,6 +44,16 @@ bat = bat.isel(x=slice(1, -1), y=slice(None, -1))
 
 bat = bat.isel({'y':slice(0,600)})
 
+#ADD SMOOTHING
+
+#Applying gaussian filter
+s2z_itera=1
+s2z_sigma = 3
+wrk = bat.copy()
+for nit in range(s2z_itera):
+    bat_gauss = gaussian_filter(wrk, sigma=s2z_sigma, truncate=(2.*s2z_sigma))
+    wrk = bat_gauss.copy()
+
 fig = plt.figure(figsize=(25, 25), dpi=100)
 spec = gridspec.GridSpec(ncols=1, nrows=1, figure=fig)
 ax = fig.add_subplot(spec[:1], projection=proj)
@@ -64,12 +75,19 @@ gl.yformatter = LATITUDE_FORMATTER
 gl.xlabel_style = {'size': 50, 'color': 'k'}
 gl.ylabel_style = {'size': 50, 'color': 'k'}
 
-cn_lev = [500., 1000., 2000., 3000., 4000., 4500., 5000.]
-ax.contour(bat.nav_lon, bat.nav_lat, bat, levels=cn_lev,colors='black',linewidths=1.5, transform=transform, zorder=4)
-ax.contour(bat.nav_lon, bat.nav_lat, bat, levels=[5000],colors='forestgreen',linewidths=3., transform=transform, zorder=4)
-ax.contour(bat.nav_lon, bat.nav_lat, bat, levels=[5500],colors='blue',linewidths=3., transform=transform, zorder=4)
+#cn_lev = [500., 1000., 2000., 3000., 4000., 4500., 5000.]
+cn_lev = [1000., 3000., 5000.]
+#ax.contour(bat.nav_lon, bat.nav_lat, bat, levels=cn_lev,colors='black',linewidths=1.5, transform=transform, zorder=4)
+#ax.contour(bat.nav_lon, bat.nav_lat, bat, levels=[5000],colors='forestgreen',linewidths=3., transform=transform, zorder=4)
+#ax.contour(bat.nav_lon, bat.nav_lat, bat, levels=[5500],colors='blue',linewidths=3., transform=transform, zorder=4)
+#ax.contour(bat.nav_lon, bat.nav_lat, bat, levels=[4000],colors='green',linewidths=3., transform=transform, zorder=4)
+ax.contour(bat.nav_lon, bat.nav_lat, bat_gauss, levels=[3550],colors='orange',linewidths=3., transform=transform, zorder=4)
+#ax.contour(bat.nav_lon, bat.nav_lat, bat_gauss, levels=[3400],colors='magenta',linewidths=3., transform=transform, zorder=4)
+#ax.contour(bat.nav_lon, bat.nav_lat, bat_gauss, levels=[3500],colors='deepskyblue',linewidths=3., transform=transform, zorder=4)
+#ax.contour(bat.nav_lon, bat.nav_lat, bat_gauss, levels=[4350],colors='deepskyblue',linewidths=3., transform=transform, zorder=4)
+ax.contour(bat.nav_lon, bat.nav_lat, bat.nav_lat, levels=[-55.3],colors='red',linewidths=3., transform=transform, zorder=4)
+#ax.contour(bat.nav_lon, bat.nav_lat, bat.nav_lat, levels=[-61.3],colors='blue',linewidths=3., transform=transform, zorder=4)
 
-ax.contour(bat.nav_lon, bat.nav_lat, bat.nav_lat, levels=[-56.3],colors='red',linewidths=6., transform=transform, zorder=4)
 
 out_name ='bathy.png'
 plt.savefig(out_name,bbox_inches="tight", pad_inches=0.1)
