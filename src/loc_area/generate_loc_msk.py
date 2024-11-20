@@ -65,12 +65,14 @@ locInfo = read_locInfo(loc_file)
 
 bathyFile = locInfo.bathyFile
 hgridFile = locInfo.hgridFile
-loc_isobt = locInfo.loc_isobt
-loc_polyg = locInfo.loc_polyg
+loc_isos  = locInfo.loc_isos
+loc_area  = locInfo.loc_area
 s2z_factr = locInfo.s2z_factr
 s2z_sigma = locInfo.s2z_sigma
+s2z_stenc = locInfo.s2z_stenc
 s2z_itera = locInfo.s2z_itera
 s2z_wghts = locInfo.s2z_wghts
+
 tol = 1.e-7
 
 # Reading bathymetry and horizontal grid
@@ -104,7 +106,7 @@ msg_info(msg)
 
 # Create mask identifying zone where 
 # we want local coordinates
-msk_loc = generate_loc_area(bathy, loc_isobt, loc_polyg)
+msk_loc = generate_loc_area(bathy, loc_isos)
 ds_loc["loc_area"] = msk_loc
 msk_loc.plot()
 plt.show()
@@ -113,8 +115,9 @@ plt.show()
 # for identifying limits of transition zone
 msk_wrk = xr.where(msk_loc==1, 1., 1.+s2z_factr)
 wrk = msk_wrk.copy()
+s2z_trunc = (((s2z_stenc - 1.)/2.)-0.5)/s2z_sigma
 for nit in range(s2z_itera):
-    zwrk_gauss = gaussian_filter(wrk, sigma=s2z_sigma, truncate=(2.*s2z_sigma))
+    zwrk_gauss = gaussian_filter(wrk, sigma=s2z_sigma, truncate=s2z_trunc)
     zwrk_gauss = msk_wrk.where(msk_loc==1, zwrk_gauss)
     wrk = zwrk_gauss.copy()
 
@@ -150,7 +153,10 @@ if s2z_wghts:
 msg = 'WRITING the bathy_meter.nc FILE'
 msg_info(msg)
 
-#out_name = splitext(basename(loc_file))[0] + '_dep' + str(loc_isobt) + '_polyg' + str(loc_polyg)
-out_name = 'dep' + str(int(loc_isobt)) + '_pol' + str(loc_polyg) + '_sig' + str(s2z_sigma) + '_itr' + str(s2z_itera)
-out_file = "bathymetry.loc_area." + out_name + ".nc"
+if loc_isos >= 0: 
+   isos = "dep"
+else:
+   isos = "lat"
+out_name = '.' + isos + str(int(loc_isos)) + '_sig' + str(s2z_sigma) + '_stn' + str(s2z_stenc) + '_itr' + str(s2z_itera)
+out_file = "bathymetry.loc_area-" + loc_area + out_name + ".nc"
 ds_loc.to_netcdf(out_file)

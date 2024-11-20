@@ -12,12 +12,13 @@ hgridFile = '/data/users/dbruciaf/GOSI10_input_files/p1.0/domcfg_eORCA025_v3.1_r
 
 # B) LOCALISATION AREA: parameters to identify
 #    limits of localisation area
-loc_isobt = 4200.
-loc_polyg = "ant"
+loc_isos = -56.7 #3200.       # iso-surface we target
+loc_area = 'antarctica' # stem to be used in the output files name
 
 # c) TRANSITION AREA: parameters for Gaussian filtering 
 #    to identify limits of transition area
 s2z_factr = 1.e-10
 s2z_sigma = 3
+s2z_stenc = 9
 s2z_itera = 1
-s2z_wghts = False
+s2z_wghts = True

@@ -4,6 +4,7 @@ from typing import Tuple
 import numpy as np
 import netCDF4 as nc4
 import xarray as xr
+import scipy.spatial as sp
 from xarray import Dataset, DataArray 
 from matplotlib import pyplot as plt
 
@@ -24,8 +25,10 @@ def read_locInfo(filepath):
     loader  = imp.SourceFileLoader(filepath,filepath)
     locInfo = loader.load_module()
 
-    attr = ['bathyFile', 'hgridFile', 'loc_isobt', 'loc_polyg',
-            's2z_factr', 's2z_sigma', 's2z_itera', 's2z_wghts' ]
+    attr = ['bathyFile', 'hgridFile', 'loc_isos' , 'loc_area' , 
+            's2z_factr', 's2z_sigma', 's2z_stenc', 's2z_itera',
+            's2z_wghts'
+           ]
 
     errmsg = False
     for a in attr:
@@ -71,64 +74,240 @@ def msg_info(message,main=False):
     print('')
 
 #=======================================================================================
-def find_bdy_JI(mask):
+def find_bdy_JI(mask: np.ndarray) -> np.ndarray:
+    """
+    Identify boundary points of a mask array.
+    
+    This function is used to identify and return the boundary points of a mask array.
+    The mask array is defined using 0|1 and the indices return are the points where
+    the value 1 is adjacent to 0.
 
-    nJ = mask.shape[0]
-    nI = mask.shape[1]
-    JI = []
-    for j in range(1,nJ):
-       for i in range(1,nI):
-           if (mask[j,i] == 0.0) and (np.sum(mask[j-1:j+2,i-1:i+2]) != 0.0):
-               JI.append([j,i])
-    return JI
+    Parameters
+    ----------
+    mask: np.ndarray
+        An array of dimension 2 containing zeros or ones, 
+        which define a masked region
+
+    Returns
+    -------
+    tji[uniqind]: np.ndarray
+        The indices of the boundary between the masked region
+
+    Notes
+    -----
+    """
+    
+    # Determine size of input array
+    nJ, nI = mask.shape
+    
+    # Bearings for overlays
+    _NORTH = [1, -1, 1, -1, 2, None, 1, -1]
+    _SOUTH = [1, -1, 1, -1, None, -2, 1, -1]
+    _EAST  = [1, -1, 1, -1, 1, -1, 2, None]
+    _WEST  = [1, -1, 1, -1, 1, -1, None, -2]
+    
+    # Create padded array for overlays
+    msk = np.pad(mask, ((1, 1), (1, 1)), "constant", constant_values=(-999))
+        
+    # Create index arrays of J and I coords
+    jgrid, igrid = np.meshgrid(np.arange(nJ), np.arange(nI), indexing='ij')
+
+    SBj, SBi = find_bdy(jgrid, igrid, msk, _SOUTH)
+    NBj, NBi = find_bdy(jgrid, igrid, msk, _NORTH)
+    EBj, EBi = find_bdy(jgrid, igrid, msk, _EAST)
+    WBj, WBi = find_bdy(jgrid, igrid, msk, _WEST)    
+        
+    # Create a 2D array index for the points that are on border
+    tji = np.column_stack( (np.concatenate((SBj, NBj, WBj, EBj)), 
+                            np.concatenate((SBi, NBi, WBi, EBi))) )
+    uniqind = unique_rows(tji)
+    
+    return tji[uniqind]
+        
+def unique_rows(ind_arr: np.ndarray) -> np.ndarray:
+    """
+    Remove any duplicates from an index array.
+    
+    This function is used to remove duplicated boundary indices
+    generated in function find_bdy.
+
+    Parameters
+    ----------
+    ind_arr: np.ndarray
+        nx2 array of J, I indices defining the boundary of a
+        mask region.
+
+    Returns
+    -------
+    indx[indx != -1]: np.ndarray
+        The indices unique values.
+
+    Notes
+    -----
+    """
+    
+    # Determine input shape
+    shp = np.shape(ind_arr)
+    
+    # Check
+    if (len(shp) > 2) or (shp[0] == 0) or (shp[1] == 0):
+        print("Warning: Shape of expected 2D array:", shp)
+    
+    # Create a sorted list of indices
+    ind_list = ind_arr.tolist()
+    ind_sort = []
+    indx = list(zip(*sorted([(val, i) for i, val in enumerate(ind_list)])))[1]
+    indx = np.array(indx)
+    
+    for i in indx:
+        ind_sort.append(ind_list[i])
+    
+    del ind_list
+    
+    for i, x in enumerate(ind_sort):
+        if x == ind_sort[i - 1]:
+            indx[i] = -1
+    
+    # If all the rows are identical, set the first as the unique row
+    if ind_sort[0] == ind_sort[-1]:
+        indx[0] = 0
+
+    return indx[indx != -1]
+
+def find_bdy(
+    jgrid: np.ndarray, 
+    igrid: np.ndarray, 
+    mask: np.ndarray,
+    brg: list,
+    ) -> tuple[ np.ndarray, np.ndarray] :
+    """
+    Identify boundary points of a mask array.
+    
+    This function is used to identify and return the boundary points of a mask array.
+    The mask array is defined using 0|1 and the indices return are the points where
+    the value 1 is adjacent to 0.
+
+    Parameters
+    ----------
+    jgrid: np.ndarray
+        An array of dimension 2 containing J indices of the masked region.
+    igrid: np.ndarray
+        An array of dimension 2 containing I indices of the masked region.
+    mask: np.ndarray
+        An array of dimension 2 containing zeros or ones, 
+        which define a masked region.
+    brg: list
+        List of the bearing overlays.
+
+    Returns
+    -------
+    bdy_J: np.ndarray
+        The J indices of the boundary between the masked region
+    bdy_I: np.ndarray
+        The I indices of the boundary between the masked region
+
+    Notes
+    -----
+    """
+    
+    # Subtract matrices to find boundaries, set to True
+    mat1 = mask[brg[2] : brg[3], brg[0] : brg[1]]
+    mat2 = mask[brg[6] : brg[7], brg[4] : brg[5]]
+
+    overlay = np.subtract(mat1, mat2)
+    
+    # Create boolean array of bdy points in overlay
+    bool_arr = overlay == 1
+
+    # Index I or J to find BDY points
+    bdy_J = jgrid[bool_arr]
+    bdy_I = igrid[bool_arr]
+
+    return bdy_J, bdy_I
 
 #=======================================================================================
-def weighting_dist(msk_zones,a):
-    '''
-    msk_zones == 2: s-levels
-    msk_zones == 1: s- to z-levels
-    msk_zones == 0: z-levels
-    '''
+def weighting_dist(msk_zones: np.ndarray, a: float) -> np.ndarray:
+    """
+    Create weights for the transition zone between coordinates.
 
-    nJ = msk_zones.shape[0]
-    nI = msk_zones.shape[1]
+    This function is used to create a weights array to allow the
+    smooth transition from one vertical coordinate system to another.
 
-    # Area where we WANT ONLY s-levels
-    msk_inner = np.ones(shape=(nJ,nI))
-    msk_inner[msk_zones==2] = 0
-    # Area where we DO NOT want z-levels
-    msk_outer = np.ones(shape=(nJ,nI))
-    msk_outer[msk_zones==0] = 0
+    Parameters
+    ----------
+    mask_zones: np.ndarray
+        An array of dimension 2 containing zeros, ones, twos. Zeros
+        indicate global vertical grid zone, Twos the zone for the
+        localised coordinates and ones the transistion zone between
+        the two.
+    a: float
+        A tuning parameter for the transition zone.
 
+    Returns
+    -------
+    weights: np.ndarray
+        An array of weights to apply to the transition zone.
+
+    Notes
+    -----
+    """
+
+    # Determine size of input array
+    nJ, nI = msk_zones.shape
+
+    # Area of localised vertical coordinates
+    msk_inner = np.zeros((nJ, nI)).astype(int)
+    msk_inner[msk_zones==2] = 1
+
+    # Area of global vertical coordinates
+    msk_outer = np.zeros((nJ, nI)).astype(int)
+    msk_outer[msk_zones==0] = 1
+
+    # Find boundary points between the zones
     bdy_inner = find_bdy_JI(msk_inner)
     bdy_outer = find_bdy_JI(msk_outer)
 
-    w = np.zeros(shape=(nJ,nI))
-    w[msk_outer == 0.0] = 0.0 # where we want only z-levels
-    w[msk_inner == 0.0] = 1.0 # where we want only s-levels
+    # Initialise the weights array
+    weights = np.zeros((nJ,nI))
+    weights[msk_outer == 1] = 0.0 # where we only want global vertical coordinates
+    weights[msk_inner == 1] = 1.0 # where we only want localised vertical coordinates
 
-    for j in range(1,nJ):
-        for i in range(1,nI):
-            if msk_outer[j,i]*msk_inner[j,i] != 0.0:
-               d_in = 999999.
-               for kbdy in bdy_inner:
-                    jj = kbdy[0]
-                    ii = kbdy[1]
-                    dist = np.sqrt((j-jj)**2 + (i-ii)**2)
-                    if dist < d_in:
-                       d_in = dist
+    # Create x and y indices for reference
+    x    = np.zeros_like(msk_zones); x += np.arange(nI)
+    y    = np.zeros_like(msk_zones); y += np.arange(nJ)[:,np.newaxis]
 
-               d_out = 999999.
-               for kbdy in bdy_outer:
-                   jj = kbdy[0]
-                   ii = kbdy[1]
-                   dist = np.sqrt((j-jj)**2 + (i-ii)**2)
-                   if dist < d_out:
-                      d_out = dist
+    ind = msk_inner+msk_outer==0 # identify only valid points
+    trans_pts = list(zip(y[ind], x[ind]))
 
-               w[j,i] = 0.5*(np.tanh(a*(2*d_out/(d_in + d_out)-1))/np.tanh(a)+1)
+    # Create source tree in which to identify distance of points in transition zone
+    # to the closest point on the inner boundary
+    source_tree = None
 
-    return w
+    source_tree = sp.cKDTree(
+                bdy_inner,
+                balanced_tree=False,
+                compact_nodes=False,
+                )
+
+    # Return distance of closest point on inner boundary
+    dist_inner, nn_id = source_tree.query(trans_pts, k=1)
+
+    # Create source tree in which to identify distance of points in transition zone
+    # to the closest point on the inner boundary
+    source_tree = None
+
+    source_tree = sp.cKDTree(
+                bdy_outer,
+                balanced_tree=False,
+                compact_nodes=False,
+                )
+
+    # Return distance of closest point on inner boundary
+    dist_outer, nn_id = source_tree.query(trans_pts, k=1)
+
+    weights[ind] = 0.5*(np.tanh(a*(2*dist_outer/(dist_inner + dist_outer)-1))/np.tanh(a)+1)
+
+    return weights
 
 #=======================================================================================
 def hvrsn_dst(lon1, lat1, lon2, lat2):
@@ -426,38 +605,31 @@ def get_poly_area_ij(points_i, points_j, a_ji):
     return area_j, area_i
 
 #=======================================================================================
-def generate_loc_area(bathy, max_dep, e_loc_rgn):
+def generate_loc_area(bathy, isosurf):
 
-    s_msk   = bathy.where(bathy<max_dep, -1)
-    s_msk   = s_msk.where(s_msk==-1, 1)
-    s_msk   = s_msk.where(s_msk==1, 0)
-    s_msk.plot()
-    plt.show()
+    if isosurf >= 0: # isobath
+       s_msk   = bathy.where(bathy<isosurf, -1)
+       s_msk   = s_msk.where(s_msk==-1, 1)
+       s_msk   = s_msk.where(s_msk==1, 0)
+       #s_msk.plot()
+       #plt.show()
 
-    # MASK FOR ANTARCTICA
-    lsm_msk = s_msk.copy()
-    lsm_msk[0,:] = -1
-    i_start = 680
-    j_start = 90
-    aa_msk_fill = floodfill(lsm_msk.data, j_start, i_start, 0, -1.)
+       # MASK FOR ANTARCTICA
+       lsm_msk = s_msk.copy()
+       lsm_msk[0,:] = -1
+       i_start = 680
+       j_start = 90
+       aa_msk_fill = floodfill(lsm_msk.data, j_start, i_start, 0, -1.)
 
-    msk = s_msk.data
+       msk = s_msk.data
 
-    if e_loc_rgn == "ant":
        # only ANTARCTICA
        msk[aa_msk_fill>=0] = 0
-    elif e_loc_rgn == "glo":
-       # MASK to exclude OPEN OCEAN AREAS
-       lsm_msk = s_msk.copy()
-       i_start = 780
-       j_start = 945
-       oo_msk_fill = floodfill(lsm_msk.data, j_start, i_start, 0, -1.)
-       # excluding ANTARCTICA 
-       msk[aa_msk_fill<0] = 0
-       # excluding OPEN OCEAN
-       msk[oo_msk_fill>=0] = 0
+       s_msk.data = msk
 
-    s_msk.data = msk
+    elif isosurf < 0: # latitude in the southern emisphere
+       s_msk   = xr.where(bathy.nav_lat<isosurf,1, 0)
+
     s_msk.plot()
     plt.show()
 
