@@ -7,6 +7,7 @@ import xarray as xr
 import scipy.spatial as sp
 from xarray import Dataset, DataArray 
 from matplotlib import pyplot as plt
+from scipy.ndimage import gaussian_filter
 
 #=======================================================================================
 def read_locInfo(filepath):
@@ -608,11 +609,50 @@ def get_poly_area_ij(points_i, points_j, a_ji):
 def generate_loc_area(bathy, isosurf):
 
     if isosurf >= 0: # isobath
-       s_msk   = bathy.where(bathy<isosurf, -1)
+
+       s2z_itera=3
+       s2z_sigma = 3
+       wrk = bathy.copy()
+       for nit in range(s2z_itera):
+          bathy_gauss = gaussian_filter(wrk, sigma=s2z_sigma, truncate=(2.*s2z_sigma))
+          wrk = bathy_gauss.copy()
+       #bathy condition
+       s_msk   = bathy.where(bathy_gauss<isosurf, -1)
+       s_msk.plot()
+       plt.show()
+      
+       #latitude condition
+       cond1=s_msk.nav_lat<-48.3
+       s_msk = s_msk.where(cond1,-1)
+       s_msk.plot()
+       plt.show()
+       
+       #latitude Drake passage
+       cond1=np.logical_or(s_msk.nav_lon <-55,s_msk.nav_lon > -32.25)
+       cond2=s_msk.nav_lat<-56.1
+       s_msk = s_msk.where(np.logical_or(cond1,cond2),-1) 
+       s_msk.plot()
+       plt.show()
+
+
+       #remove unwanted area
+       cond1=np.logical_or(s_msk.nav_lon <-65.7,s_msk.nav_lon > -62.75)
+       cond2=s_msk.nav_lat<-61.3
+       s_msk = s_msk.where(np.logical_or(cond1,cond2),-1)
+       s_msk.plot()
+       plt.show()
+       
+       #remove unwanted area
+       cond1=np.logical_or(s_msk.nav_lon <80.2,s_msk.nav_lon > 87.5)
+       cond2=s_msk.nav_lat<-63.8
+       s_msk = s_msk.where(np.logical_or(cond1,cond2),-1)
+       s_msk.plot()
+       plt.show()
+       
        s_msk   = s_msk.where(s_msk==-1, 1)
        s_msk   = s_msk.where(s_msk==1, 0)
-       #s_msk.plot()
-       #plt.show()
+       s_msk.plot()
+       plt.show()
 
        # MASK FOR ANTARCTICA
        lsm_msk = s_msk.copy()
