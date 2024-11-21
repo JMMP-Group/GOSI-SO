@@ -1,0 +1,10 @@
+#!/bin/bash -l
+
+#SBATCH --qos=normal                
+#SBATCH --mem=150000                    
+#SBATCH --ntasks=8                   
+#SBATCH --output=hpge_orca025.out       
+#SBATCH --time=360                    
+
+python plot_sec_vcoord_rmax.py
+
