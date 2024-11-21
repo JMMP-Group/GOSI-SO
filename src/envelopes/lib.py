@@ -48,7 +48,7 @@ def read_envInfo(filepath):
     return envInfo
 
 #=======================================================================================
-def calc_zenv(bathy, surf, offset, max_dep):
+def calc_zenv(bathy, surf, offset, max_dep, loc_msk):
     """
     Constructs an envelop bathymetry 
     for the sigma levels definition.
@@ -67,10 +67,6 @@ def calc_zenv(bathy, surf, offset, max_dep):
     zenv   = bathy.copy()
     env_up = surf.copy()
 
-    # Set minimum depth of the envelope
-    env_up += offset
-    zenv = np.maximum(zenv, env_up)
-
     if max_dep < 0:
        max_dep *= -1.
        msk_val = -99
@@ -88,14 +84,15 @@ def calc_zenv(bathy, surf, offset, max_dep):
        msk.data = msk_fill
        msk = xr.where(msk==-9999.,0,1)
     else:
-       msk = bathy*0. + 1
+       msk = bathy*0.
 
     # Set maximum depth of the envelope
     zenv = zenv.where(msk==1,np.minimum(zenv, max_dep))
-
+    zenv = zenv.where(loc_msk==1, max_dep)
+    
     # Set minimum depth of the envelope
-    #env_up += offset
-    #zenv = np.maximum(zenv, env_up)
+    env_up += offset
+    zenv = np.maximum(zenv, env_up)
 
     return zenv
 

@@ -80,6 +80,14 @@ else:
    ds_bathy = ds_bathy.set_coords(["nav_lon","nav_lat"])
 
 bathy = ds_bathy["Bathymetry"].fillna(0.).squeeze()
+if 'loc_area' in ds_bathy.variables:
+   loc = True
+   loc_msk = ds_bathy["loc_area"]
+   msg = ('   Setting a localised MEs-coordinates system')
+   msg_info(msg)
+else:
+   loc = False
+   loc_msk = bathy*0 + 1
 ds_env = ds_bathy.copy()
 
 # Defining local variables -----------------------------------------------------
@@ -103,11 +111,6 @@ tol = 1.e-7
 # Computing LSM
 lsm = xr.where(bathy > 0, 1, 0) 
 
-loc = False
-#if "loc_area" in ds_env.variables:
-#   loc = True
-#   loc_area = ds_env["loc_area"]
-
 #--------------------------------------------------------------------------------------
 # Cretaing envelopes
 for env in range(num_env):
@@ -121,11 +124,14 @@ for env in range(num_env):
     # =============================================================
     # 1. GEOMETRY of the envelope
     #
-    # e_min_ofs[env] > 0     : offset to be added to surf to comupute 
-    #                          minimum depth of envelope env
-    # e_min_ofs[env] = 'flat': flat envelope with constant depth of
-    #                          e_max_dep[env] m
-    # e_max_dep[env] = 'max' : e_max_dep[env] = np.amax(bathy)
+    # e_min_ofs[env] > 0     : offset to be added to envelope hbatt[env-1] to comupute
+    #                          minimum depth of envelope hbatt[env].
+    # e_min_ofs[env] = 'flat': flat envelope with constant depth of e_max_dep[env] m
+    # e_max_dep[env] > 0     : maximum depth of envelope hbatt[env], applied everywhere
+    #                          in the domain
+    # e_max_dep[env] < 0     : for the case of Antarctica, maximum depth is applied
+    #                          only in the open ocean.
+    # e_max_dep[env] = 'max' : e_max_dep[env] = max(bathy)
 
     msg = '1. Computing the geometry of the envelope'
     msg_info(msg)
@@ -147,12 +153,18 @@ for env in range(num_env):
        msg = 'Generating a flat envelope'
        msg_info(msg)
        hbatt = xr.full_like(bathy,e_max_dep[env],dtype=np.double)
+
     # CASE B: general envelope
     else:
        msg = 'Generating a general envelope'
        msg_info(msg)
-       hbatt = calc_zenv(env_bathy, surf, e_min_ofs[env], e_max_dep[env])  
- 
+       hbatt = calc_zenv(env_bathy, surf, e_min_ofs[env], e_max_dep[env], loc_msk)  
+
+    # Check that envelope is deeper than the one just above
+    if np.sum(hbatt < surf) > 0:
+       msg_err = "Envelope " + str(env) + " is shallower than envelope " + str(env-1)
+       raise ValueError(msg_err)
+
     # MEs-coordinates are tapered in vicinity of the Equator
     if e_tap_equ:
        if (np.nanmax(gphit) * np.nanmin(gphit)) < 0:
@@ -264,12 +276,6 @@ for env in range(num_env):
        # smoothing with Martinho & Batteen 2006 
        hbatt_smt = smooth_MB06(da_wrk, e_glo_rmx[env])
 
-    # Localising if needed
-    if loc:
-       msg = ('   Setting a localised MEs-coordinates system')
-       msg_info(msg)
-       hbatt_smt = hbatt_smt.where(loc_area == 1, e_max_dep[env])
-
     # Computing then MB06 Slope Parameter for the smoothed envelope
     rmax0_smt = calc_rmax(hbatt_smt)*lsm
     rmax0_smt.plot.pcolormesh(add_colorbar=True, add_labels=True, \
@@ -283,35 +289,6 @@ for env in range(num_env):
     # Saving envelope DataArray
     ds_env["hbatt_"+str(env+1)] = hbatt_smt
     ds_env["rmax0_"+str(env+1)] = rmax0_smt
-
-# -------------------------------------------------------------------------------------
-# Setting a localised MEs-coord. system if required
-#if "s2z_wgt" in ds_env.variables:
-#
-#   msg = 'SETTING A LOCALISED MEs-coordinates system'
-#   msg_info(msg, main=True)
-#
-#   # Read weights
-#   weights = ds_env["s2z_wgt"]
-#
-#   # Read distribution of levels of global z-coord. grid
-#   dsz = xr.open_dataset(envInfo.zgridFile)
-# 
-#   if "nav_lev" in dsz.dims:
-#      dsz = dsz.rename_dims({'nav_lev':'z'})
-#
-#   # Computing vertical levels depth
-#   # We use e3{t,z}_1d to avoid z-partial steps
-#   e3T = dsz.e3t_1d.broadcast_like(dsz.e3t_0).squeeze()
-#   e3W = dsz.e3w_1d.broadcast_like(dsz.e3w_0).squeeze()
-#   gdepw_0, gdept_0 = e3_to_dep(e3W, e3T)
-#
-#   # Creating transitioning deeper envelope
-#   env = ds_env["hbatt_"+str(num_env)]
-#   lev = gdepw_0[{"z":-1}]
-#   wrk = xr.full_like(env,None,dtype=np.double)
-#   wrk.data = weights * env.data + (1. - weights) * lev.data
-#   ds_env["hbatt_"+str(num_env)].data = wrk.data
 
 # -------------------------------------------------------------------------------------   
 # Writing the bathy_meter.nc file
