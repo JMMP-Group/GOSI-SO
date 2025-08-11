@@ -1,0 +1,5 @@
+*.out
+*.nc
+*__pycache__
+*Thumbs.db
+*.png
