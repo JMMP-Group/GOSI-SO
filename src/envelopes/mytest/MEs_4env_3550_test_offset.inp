@@ -58,7 +58,7 @@
 # A) IINPUT FILES
 
 # Bathymetry of the domain
-bathyFile = '../loc_area/bathymetry.loc_area-antarctica.dep3550_sig3_stn9_itr3.nc'
+bathyFile = '/data/users/frcg/GOSI10/SouthernOcean/GOSI-SO/src/loc_area/bathymetry.loc_area-antarctica.dep3550_sig3_stn9_itr1.nc'
 
 # Horizontal grid of the domain
 hgridFile = '/data/users/dbruciaf/GOSI10_input_files/p1.0/domcfg_eORCA025_v3.1_r42.nc'
@@ -68,31 +68,30 @@ zgridFile = "/data/users/dbruciaf/GOSI10_input_files/p1.0/domcfg_eORCA025_v3.1_r
 
 # B) ENVELOPES geometrical parameters -------------------------------------
 
-# *) e_min_ofs[i] is the offset to be added to the envelope env[i-1] just above
+# *) e_min_ofs[i] is the offset to be added to the previous envelope env[i-1]
 #    in order to calcalute the minimum depths of the new envelope.
 #
 # *) e_max_dep[i] is the maximum depth of envelope env[i]. If 
 #
 #      a) e_max_dep[i] > 0 : the capping will be applied everywhere in the domain
-#      b) e_max_dep[i] < 0 : for the case of Antarctica, the capping is applied only 
-#                            in the open ocean
+#      b) e_max_dep[i] > 0 : the capping will be applied only in the open ocean
 #
 # *) To create a flat envelope env[i] with constant depth e_max_dep[i]:                                   
-# 
-#      e_min_ofs[i] = "flat", e_max_dep[i] > 0     
+#
+#    e_min_ofs[i] = "flat", e_max_dep[i] > 0                                
 #                                                                    
 # *) To create an envelope env[0] which will generate classical s-levels:             
 #
-#      e_min_ofs[i] > 0, e_max_dep[i] = "max"                                
+#    e_min_ofs[i] > 0, e_max_dep[i] = "max"                                
 #
 # *) To create a totally flat envelope env[0] which will generate classical 
 #    z-levels: 
 #
-#      e_min_ofs[0] = "flat", e_max_dep[0] = "max"                               
+#    e_min_ofs[i] = "flat", e_max_dep[i] = "max"                               
 #
 
-e_min_ofs = [ "flat",   30.,  110.,  "flat"]
-e_max_dep = [    10., -700., 3550.,   6010.]
+e_min_ofs = [ "flat",   30.,  30., "flat"]
+e_max_dep = [  10.  ,  -700., 3550.,  5800.]
 
 # C) ENVELOPES smoothing parameters ------------------------------------------
 

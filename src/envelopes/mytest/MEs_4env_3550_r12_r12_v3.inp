@@ -91,7 +91,7 @@ zgridFile = "/data/users/dbruciaf/GOSI10_input_files/p1.0/domcfg_eORCA025_v3.1_r
 #      e_min_ofs[0] = "flat", e_max_dep[0] = "max"                               
 #
 
-e_min_ofs = [ "flat",   30.,  110.,  "flat"]
+e_min_ofs = [ "flat",   30.,  30.,  "flat"]
 e_max_dep = [    10., -700., 3550.,   6010.]
 
 # C) ENVELOPES smoothing parameters ------------------------------------------

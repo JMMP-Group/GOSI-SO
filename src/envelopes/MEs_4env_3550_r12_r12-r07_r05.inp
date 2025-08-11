@@ -61,10 +61,10 @@
 bathyFile = '../loc_area/bathymetry.loc_area-antarctica.dep3550_sig3_stn9_itr3.nc'
 
 # Horizontal grid of the domain
-hgridFile = '/data/users/dbruciaf/GOSI10_input_files/p1.0/domcfg_eORCA025_v3.1_r42.nc'
+hgridFile = '/data/users/diego.bruciaferri/Model_Config/GOSI/GOSI10_input_files/p1.0/domcfg_eORCA025_v3.1_r42.nc'
 
 # domain_cfg.nc or mesh_mask.nc file of the z-levels grid
-zgridFile = "/data/users/dbruciaf/GOSI10_input_files/p1.0/domcfg_eORCA025_v3.1_r42.nc"
+zgridFile = "/data/users/diego.bruciaferri/Model_Config/GOSI/GOSI10_input_files/p1.0/domcfg_eORCA025_v3.1_r42.nc"
 
 # B) ENVELOPES geometrical parameters -------------------------------------
 
@@ -103,15 +103,16 @@ e_tap_equ = False
 # List of lists of velocity files to use for HPGE aware local smoothing.   
 # Use an empty list if you don't want to apply local smoothing to a particular envelope.
 e_loc_vel = [ [],
+              ['/data/users/catherine.guiavarch/GOSI10/SouthernOcean/GOSI-SO/GOSI-SO_inputs/maximum_hpge_MEs_4env_3550_r12_r12.nc'],
+              ['/data/users/catherine.guiavarch/GOSI10/SouthernOcean/GOSI-SO/GOSI-SO_inputs/maximum_hpge_MEs_4env_3550_r12_r12.nc'],
               [],
-              [],
-              [] ]
-e_loc_var = [ [], [], [], [] ]
+            ]
+e_loc_var = [ [], ['max_hpge_2'], ['max_hpge_3'], [] ]
 # List of max spurious currents that will be used as a threshold
-e_loc_vmx = [ [0.], [0.], [0.], [0.] ]
+e_loc_vmx = [ [0.], [0.01], [0.01], [0.] ]
 
 # List of max slope parameters rx0 for local smoothing. 
-e_loc_rmx = [ [0.], [0.], [0.], [0.] ]
+e_loc_rmx = [ [0.], [0.07], [0.05], [0.] ]
 
 # List of halo for applying the local smoothing.
 e_loc_hal = [ [0], [0], [0], [0] ]
