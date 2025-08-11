@@ -1,0 +1,10 @@
+#!/bin/bash -l
+
+#SBATCH --qos=normal                
+#SBATCH --mem=200000                    
+#SBATCH --ntasks=8                   
+#SBATCH --output=timeseries_orca025.out       
+#SBATCH --time=360                    
+
+#python calc_timeseries.py
+python calc_timeseries_orca12.py
